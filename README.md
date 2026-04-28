@@ -1,50 +1,81 @@
-# Expense Tracker Application
+# Sunrise Ledger - Personal Finance Tracker
 
-A full-stack personal finance tool designed with production-readiness in mind. It handles real-world scenarios such as unreliable networks, duplicate submissions, and data precision.
+Sunrise Ledger is a full-stack personal finance application built to help users seamlessly record, review, and understand their expenses. Designed for real-world reliability, it securely handles edge cases like slow networks, page reloads, and duplicate submissions.
 
-## Key Features & Acceptance Criteria Met
-- Create, view, filter (by category & date), and sort (by date) expenses.
-- Calculates dynamic totals based on the active filters.
-- **Robust API**: Handles duplicate submissions safely using Idempotency Keys and automatically retries failed requests using exponential backoff.
+---
 
-## Key Design Decisions
+## 🚀 Core Features
 
-### 1. Money Handling (Data Correctness)
-**Decision:** Store all monetary values as integer cents in the database (e.g., `₹10.50` is stored as `1050`).
-**Why:** Floating-point arithmetic in JavaScript (and standard databases) can lead to precision loss (e.g., `0.1 + 0.2 = 0.30000000000000004`). By converting inputs to cents on the frontend before sending them to the API, and storing them as integers in the database, we guarantee 100% precision. The values are only formatted back into decimals for the UI.
+- **Expense Management:** Create, view, and manage expenses with accurate dates, categories, and descriptions.
+- **Dynamic Analysis:** Filter transactions by category and date ranges (Today, This Week, This Month).
+- **Intelligent Sorting:** Sort expenses chronologically (newest or oldest first).
+- **Live Summaries:** Instantly view the total expense amount of the currently visible/filtered list.
+- **"Nice to Have" Implementations:**
+  - Strict data validation (prevents negative amounts, enforces date schemas).
+  - Visual category breakdown & dynamic budget tracking.
+  - Comprehensive Unit Tests for data validators.
+  - Interactive UI with robust loading and error states.
+  - JWT Authentication & Multi-user isolation.
 
-### 2. Network Reliability & Duplicate Prevention (Idempotency)
-**Decision:** Implemented an `X-Idempotency-Key` header for the `POST /api/expenses` route. 
-**Why:** In real-world conditions on mobile devices or slow networks, users often double-click "Submit" or the browser retries a request. 
-- **Frontend**: The `expenseClient.js` generates a unique UUID for every new form submission and uses exponential backoff to retry if the server drops the connection.
-- **Backend**: The Express server intercepts the idempotency key, checks if it exists in the `ProcessedRequests` collection, and if so, returns the previously cached response instead of creating a duplicate expense.
+---
 
-### 3. Persistence Choice (MongoDB / Mongoose)
-**Decision:** Used MongoDB as the database.
-**Why:** MongoDB allows for rapid iteration and flexible schemas. By utilizing Mongoose, we enforce strict validation rules at the application layer (e.g., minimum amount constraints, enum validation for categories, and required fields), preventing bad data from being persisted.
+## 🧠 Architectural & Design Decisions
 
-### 4. Client-side vs Server-side Filtering
-**Decision:** We implemented both! The backend API fully supports query parameters (`?category=food&sort=date_asc`) as requested. However, to provide a lightning-fast "command center" feel, the React frontend fetches the user's data and performs filtering, sorting, and aggregations entirely locally using `useMemo`. This prevents unnecessary round-trips to the server when the user is just exploring their data.
+### 1. Persistence Mechanism: MongoDB & Mongoose
+**Choice:** MongoDB (NoSQL) alongside Mongoose as an ODM.
+**Reasoning:** Personal finance data relies heavily on aggregations and rapid reading/writing. MongoDB provides excellent read performance and seamless horizontal scaling. Mongoose allows us to strictly enforce data schemas at the application layer—guaranteeing that invalid categories, negative amounts, or missing descriptions are rejected before touching the database.
 
-### 5. Authentication (Added Feature)
-**Decision:** Added JWT-based authentication.
-**Why:** A personal finance tool is highly sensitive. The application includes a full login/signup flow, hashing passwords with `bcryptjs`, and securing routes so users can only access their own expenses (`user_id` mapping).
+### 2. Money Handling & Data Correctness
+**Approach:** All monetary values are handled and stored strictly as **integer cents** (e.g., `$10.50` is stored as `1050`). 
+**Reasoning:** Floating-point arithmetic in JavaScript is notoriously imprecise (e.g., `0.1 + 0.2 = 0.30000000000000004`). By doing all calculations in integer cents and only converting to decimals for the UI, we guarantee 100% financial data accuracy and prevent rounding errors over time.
 
-## Trade-offs & Timebox Considerations
-- **Testing:** Due to time constraints, comprehensive E2E tests (like Cypress or Playwright) were omitted.
-- **Pagination:** If a user has thousands of expenses, the current "fetch all and filter locally" approach would become memory-heavy. In a truly scaled production app, we would implement cursor-based pagination and push the filtering fully back to the database.
+### 3. Handling Real-World Network Conditions (Idempotency)
+**Approach:** Implemented an `X-Idempotency-Key` mechanism for the `POST /api/expenses` endpoint.
+**Reasoning:** In real-world scenarios, users might accidentally double-click the "Submit" button, or mobile browsers might automatically retry a request due to a dropped connection. 
+- The React frontend generates a unique UUID for every new form submission.
+- The Express backend intercepts this UUID. If the database indicates this specific request was already processed, the backend safely returns the cached success response rather than charging/creating a duplicate expense.
 
-## Setup Instructions
+---
 
-### Backend
-1. `cd Backend`
-2. Create a `.env` file with: `MONGODB_URI=mongodb://localhost:27017/expense-tracker` and `JWT_SECRET=your_secret`
-3. `npm install`
-4. `node index.js` (Runs on port 3001)
+## ⚖️ Trade-Offs & Timebox Considerations
 
-### Frontend
-1. `cd Frontend`
-2. `npm install`
-3. `npm run dev` (Runs on port 5173)
+Given the scope of the assignment, the following trade-offs were made:
 
-Enjoy managing your finances!
+1. **Client-Side vs. Server-Side Filtering:** 
+   The backend API fully supports filtering and sorting via query parameters (e.g., `?category=food&sort=date_desc`). However, for an ultra-responsive UX, the frontend fetches the user's dataset and handles minor filtering locally. *Trade-off:* If a user accumulates tens of thousands of expenses over years, this approach consumes excess browser memory. In a large-scale production app, I would implement cursor-based pagination and rely purely on the database index for filtering.
+   
+2. **Testing Coverage:**
+   While I implemented backend unit tests for the core data validation logic, comprehensive End-to-End (E2E) UI testing using tools like Cypress or Playwright was omitted due to time constraints.
+
+---
+
+## 🚫 What Was Intentionally Omitted
+
+- **OAuth / Social Login:** To keep the focus strictly on the core CRUD expense requirements and system reliability, advanced authentication methods (like Google/GitHub login) were skipped in favor of a straightforward, secure JWT/bcrypt implementation.
+- **Complex Budgeting Features:** Features like rollover budgets, multi-currency support, or custom user-defined categories were left out to maintain a minimal, polished, and bug-free core feature set.
+
+---
+
+## 🛠️ Setup & Local Development
+
+### Prerequisites
+- Node.js (v18+)
+- MongoDB (Local instance or Atlas URI)
+
+### Backend Setup
+1. Navigate to the backend directory: `cd Backend`
+2. Install dependencies: `npm install`
+3. Set environment variables: Create a `.env` file containing:
+   ```env
+   PORT=3001
+   MONGODB_URI=mongodb://localhost:27017/expense-tracker
+   JWT_SECRET=your_secure_secret
+   ```
+4. Run the server: `node index.js`
+5. Run unit tests: `node --test tests/validators.test.js`
+
+### Frontend Setup
+1. Navigate to the frontend directory: `cd Frontend`
+2. Install dependencies: `npm install`
+3. Start the Vite development server: `npm run dev`
+4. The application will be available at `http://localhost:5173`.
