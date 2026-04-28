@@ -31,6 +31,17 @@ function App() {
     setRefreshTrigger(prev => prev + 1);
   };
 
+  const handleDelete = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this expense?')) return;
+    try {
+      await expenseAPI.deleteExpense(id);
+      setRefreshTrigger(prev => prev + 1);
+    } catch (err) {
+      console.error('Failed to delete expense', err);
+      alert('Failed to delete expense');
+    }
+  };
+
   // Filter and Sort Logic
   const filteredExpenses = useMemo(() => {
     let result = [...expenses];
@@ -101,6 +112,37 @@ function App() {
   const todayStr = new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date());
 
   const budgetUsedPct = parseFloat(budget) > 0 ? Math.min(100, (mtdSpend / (parseFloat(budget) * 100)) * 100) : 0;
+
+  const handleExportCSV = () => {
+    if (filteredExpenses.length === 0) return;
+    
+    // Headers
+    const headers = ['Date', 'Category', 'Description', 'Amount (INR)'];
+    
+    // Rows
+    const csvRows = filteredExpenses.map(exp => [
+      formatDate(exp.date),
+      exp.category,
+      `"${exp.description.replace(/"/g, '""')}"`, // escape quotes
+      (exp.amount / 100).toFixed(2)
+    ]);
+    
+    // Combine
+    const csvContent = [
+      headers.join(','),
+      ...csvRows.map(row => row.join(','))
+    ].join('\n');
+    
+    // Download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `expenses_export_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
     <div className="layout-container">
@@ -221,7 +263,23 @@ function App() {
                 <div className="section-label">EXPENSES</div>
                 <h2 className="card-title" style={{marginBottom: 0}}>Transactions ledger</h2>
               </div>
-              <div className="record-count">{filteredExpenses.length} records</div>
+              <div style={{display: 'flex', gap: '0.5rem', alignItems: 'center'}}>
+                <button 
+                  onClick={handleExportCSV} 
+                  style={{
+                    background: 'transparent', 
+                    border: '1px solid var(--input-border)', 
+                    padding: '0.25rem 0.75rem', 
+                    borderRadius: '999px', 
+                    fontSize: '0.75rem', 
+                    color: 'var(--text-main)',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Export CSV
+                </button>
+                <div className="record-count">{filteredExpenses.length} records</div>
+              </div>
             </div>
             
             <table className="ledger-table">
@@ -231,6 +289,7 @@ function App() {
                   <th>CATEGORY</th>
                   <th>DESCRIPTION</th>
                   <th>DATE</th>
+                  <th style={{textAlign: 'right'}}>ACTION</th>
                 </tr>
               </thead>
               <tbody>
@@ -240,6 +299,22 @@ function App() {
                     <td style={{textTransform: 'capitalize'}}>{exp.category}</td>
                     <td>{exp.description}</td>
                     <td>{formatDate(exp.date)}</td>
+                    <td style={{textAlign: 'right'}}>
+                      <button 
+                        onClick={() => handleDelete(exp.id)}
+                        style={{
+                          background: 'transparent',
+                          color: '#d9534f',
+                          padding: '4px 8px',
+                          fontSize: '0.8rem',
+                          fontWeight: '600',
+                          border: 'none',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
