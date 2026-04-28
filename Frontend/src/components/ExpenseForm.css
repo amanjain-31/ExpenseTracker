@@ -11,17 +11,22 @@
 }
 
 .refresh-btn {
-  background: white;
+  background: transparent;
   border: 1px solid var(--input-border);
   padding: 0.5rem 1rem;
   border-radius: 999px;
   font-size: 0.85rem;
   font-weight: 500;
   color: var(--text-main);
+  transition: background-color 0.2s;
 }
 
 .refresh-btn:hover {
-  background: #f0f0f0;
+  background: rgba(0,0,0,0.05);
+}
+
+body.dark-theme .refresh-btn:hover {
+  background: rgba(255,255,255,0.1);
 }
 
 .expense-form-grid {

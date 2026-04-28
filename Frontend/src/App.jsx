@@ -15,6 +15,7 @@ function DashboardView() {
   const [expenses, setExpenses] = useState([]);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [budget, setBudget] = useState('25000');
+  const [selectedExpense, setSelectedExpense] = useState(null);
   
   // View Controls state
   const [searchQuery, setSearchQuery] = useState('');
@@ -63,10 +64,22 @@ function DashboardView() {
     if (selectedCategory) {
       result = result.filter(e => e.category === selectedCategory);
     }
-    if (dateWindow === 'month') {
+    if (dateWindow !== 'all') {
       const now = new Date();
-      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-      result = result.filter(e => new Date(e.date) >= firstDay);
+      if (dateWindow === 'today') {
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        result = result.filter(e => new Date(e.date) >= today);
+      } else if (dateWindow === 'week') {
+        const d = new Date();
+        const day = d.getDay();
+        const diff = d.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
+        const firstDayOfWeek = new Date(d.setDate(diff));
+        firstDayOfWeek.setHours(0,0,0,0);
+        result = result.filter(e => new Date(e.date) >= firstDayOfWeek);
+      } else if (dateWindow === 'month') {
+        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+        result = result.filter(e => new Date(e.date) >= firstDay);
+      }
     }
     result.sort((a, b) => {
       const dateA = new Date(a.date).getTime();
@@ -131,6 +144,21 @@ function DashboardView() {
     document.body.removeChild(link);
   };
 
+  const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
+
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.body.classList.add('dark-theme');
+    } else {
+      document.body.classList.remove('dark-theme');
+    }
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'light' ? 'dark' : 'light');
+  };
+
   return (
     <div className="layout-container">
       <div className="header-section">
@@ -141,8 +169,20 @@ function DashboardView() {
         </div>
         <div className="header-right">
           <div style={{display: 'flex', gap: '1rem', alignItems: 'center'}}>
-            <div className="theme-pill">Theme: Sunrise Ledger</div>
-            <button onClick={handleLogout} className="theme-pill" style={{cursor: 'pointer', background: 'var(--danger-light)', color: 'var(--danger)', border: 'none'}}>Logout</button>
+            <button 
+              onClick={toggleTheme} 
+              className="theme-pill" 
+              style={{cursor: 'pointer', background: 'transparent', border: '1px solid var(--card-border)', color: 'var(--text-main)'}}
+            >
+              {theme === 'light' ? '🌙 Midnight Ledger' : '☀️ Sunrise Ledger'}
+            </button>
+            <button 
+              onClick={handleLogout} 
+              className="theme-pill" 
+              style={{cursor: 'pointer', background: 'var(--danger-light)', color: 'var(--danger)', border: 'none'}}
+            >
+              Logout
+            </button>
           </div>
           <div className="date-text">{todayStr}</div>
         </div>
@@ -222,6 +262,8 @@ function DashboardView() {
               <label>Date window</label>
               <select value={dateWindow} onChange={e => setDateWindow(e.target.value)}>
                 <option value="all">All time</option>
+                <option value="today">Today</option>
+                <option value="week">This week</option>
                 <option value="month">This month</option>
               </select>
             </div>
@@ -270,13 +312,13 @@ function DashboardView() {
               </thead>
               <tbody>
                 {filteredExpenses.slice(0, 10).map(exp => (
-                  <tr key={exp.id}>
+                  <tr key={exp.id} className="clickable-row" onClick={() => setSelectedExpense(exp)}>
                     <td style={{fontWeight: 600}}>{formatCurrency(exp.amount)}</td>
                     <td style={{textTransform: 'capitalize'}}>{exp.category}</td>
                     <td>{exp.description}</td>
                     <td>{formatDate(exp.date)}</td>
                     <td style={{textAlign: 'right'}}>
-                      <button onClick={() => handleDelete(exp.id)} style={{background: 'transparent', color: '#d9534f', padding: '4px 8px', fontSize: '0.8rem', fontWeight: '600', border: 'none', cursor: 'pointer'}}>Delete</button>
+                      <button onClick={(e) => { e.stopPropagation(); handleDelete(exp.id); }} style={{background: 'transparent', color: '#d9534f', padding: '4px 8px', fontSize: '0.8rem', fontWeight: '600', border: 'none', cursor: 'pointer'}}>Delete</button>
                     </td>
                   </tr>
                 ))}
@@ -286,6 +328,67 @@ function DashboardView() {
           </div>
         </div>
       </div>
+
+      {/* Expense Detail Modal */}
+      {selectedExpense && (
+        <div className="modal-overlay" onClick={() => setSelectedExpense(null)}>
+          <div className="modal-content glass-card" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2 className="card-title" style={{marginBottom: 0}}>Expense Details</h2>
+              <button className="modal-close" onClick={() => setSelectedExpense(null)}>&times;</button>
+            </div>
+            
+            <div className="modal-detail-row">
+              <div className="modal-label">Amount</div>
+              <div className="modal-value large">{formatCurrency(selectedExpense.amount)}</div>
+            </div>
+            
+            <div className="modal-detail-row">
+              <div className="modal-label">Description</div>
+              <div className="modal-value">{selectedExpense.description}</div>
+            </div>
+            
+            <div className="modal-detail-row">
+              <div className="modal-label">Category</div>
+              <div className="modal-value" style={{textTransform: 'capitalize', display: 'flex', alignItems: 'center'}}>
+                <span style={{
+                  display: 'inline-block',
+                  width: '10px',
+                  height: '10px',
+                  borderRadius: '50%',
+                  backgroundColor: getCategoryColor(selectedExpense.category),
+                  marginRight: '8px'
+                }}></span>
+                {selectedExpense.category}
+              </div>
+            </div>
+            
+            <div className="modal-detail-row">
+              <div className="modal-label">Date</div>
+              <div className="modal-value">{formatDate(selectedExpense.date)}</div>
+            </div>
+            
+            <div className="modal-detail-row">
+              <div className="modal-label">Transaction ID</div>
+              <div className="modal-value" style={{fontSize: '0.8rem', fontFamily: 'monospace', color: 'var(--text-muted)'}}>
+                {selectedExpense.id}
+              </div>
+            </div>
+
+            <div style={{marginTop: '2rem', display: 'flex', justifyContent: 'flex-end', gap: '1rem'}}>
+              <button 
+                onClick={() => {
+                  handleDelete(selectedExpense.id);
+                  setSelectedExpense(null);
+                }}
+                style={{background: 'var(--danger-light)', color: 'var(--danger)', padding: '0.75rem 1.5rem', borderRadius: '8px', fontWeight: '600', border: 'none', cursor: 'pointer'}}
+              >
+                Delete Expense
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
