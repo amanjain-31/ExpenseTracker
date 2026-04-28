@@ -1,38 +1,38 @@
 /**
- * Format cents to USD string
+ * Format cents to INR string
  * @param {number} cents - Amount in cents
- * @returns {string} Formatted as "$XX.XX"
+ * @returns {string} Formatted as "₹XX.XX"
  */
 export function formatCurrency(cents) {
-  const dollars = cents / 100;
-  return new Intl.NumberFormat('en-US', {
+  const rupees = cents / 100;
+  return new Intl.NumberFormat('en-IN', {
     style: 'currency',
-    currency: 'USD',
-  }).format(dollars);
+    currency: 'INR',
+  }).format(rupees);
 }
 
 /**
- * Convert USD string to cents
- * @param {string} dollarString - Amount like "10.50" or "10"
+ * Convert INR string to cents
+ * @param {string} rupeeString - Amount like "10.50" or "10"
  * @returns {number} Amount in cents
  */
-export function dollarsToCents(dollarString) {
-  const dollars = parseFloat(dollarString);
-  if (isNaN(dollars)) {
+export function dollarsToCents(rupeeString) {
+  const rupees = parseFloat(rupeeString);
+  if (isNaN(rupees)) {
     throw new Error('Invalid amount');
   }
   // Round to nearest cent to handle floating point issues
-  return Math.round(dollars * 100);
+  return Math.round(rupees * 100);
 }
 
 /**
- * Format ISO date to "MMM DD, YYYY"
+ * Format ISO date to "DD MMM YYYY"
  */
 export function formatDate(isoDate) {
   const date = new Date(isoDate);
-  return new Intl.DateTimeFormat('en-US', {
+  return new Intl.DateTimeFormat('en-GB', {
+    day: '2-digit',
     month: 'short',
-    day: 'numeric',
     year: 'numeric',
   }).format(date);
 }

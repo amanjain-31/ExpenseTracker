@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { expenseAPI } from '../api/expenseClient';
 import { dollarsToCents, getTodayForInput } from '../utils/formatting';
 import { motion, AnimatePresence } from 'framer-motion';
-import { PlusCircle } from 'lucide-react';
 import './ExpenseForm.css';
 
 export default function ExpenseForm({ onExpenseCreated }) {
@@ -32,7 +31,6 @@ export default function ExpenseForm({ onExpenseCreated }) {
 
     try {
       const amountInCents = dollarsToCents(formData.amount);
-
       const createdExpense = await expenseAPI.createExpense({
         amount: amountInCents,
         category: formData.category,
@@ -56,93 +54,112 @@ export default function ExpenseForm({ onExpenseCreated }) {
     }
   };
 
+  const handleRefresh = () => {
+    setFormData({
+      amount: '',
+      category: 'food',
+      description: '',
+      date: getTodayForInput(),
+    });
+    setError(null);
+  };
+
   return (
-    <form onSubmit={handleSubmit} className="expense-form glass-panel">
-      <h2>Add Expense</h2>
-
-      <div className="form-group">
-        <label htmlFor="amount">Amount ($)</label>
-        <input
-          id="amount"
-          type="number"
-          name="amount"
-          value={formData.amount}
-          onChange={handleChange}
-          placeholder="0.00"
-          step="0.01"
-          min="0.01"
-          required
-          disabled={isLoading}
-        />
+    <div className="glass-card expense-form-container">
+      <div className="card-header-row">
+        <div>
+          <div className="section-label">NEW EXPENSE</div>
+          <h2 className="card-title">Create a transaction</h2>
+        </div>
+        <button type="button" className="refresh-btn" onClick={handleRefresh}>
+          Refresh
+        </button>
       </div>
 
-      <div className="form-group">
-        <label htmlFor="category">Category</label>
-        <select
-          id="category"
-          name="category"
-          value={formData.category}
-          onChange={handleChange}
-          disabled={isLoading}
-        >
-          <option value="food">🍔 Food</option>
-          <option value="transport">🚗 Transport</option>
-          <option value="entertainment">🎬 Entertainment</option>
-          <option value="utilities">💡 Utilities</option>
-          <option value="other">📌 Other</option>
-        </select>
-      </div>
+      <form onSubmit={handleSubmit} className="expense-form-grid">
+        <div className="form-group">
+          <label htmlFor="amount">Amount</label>
+          <input
+            id="amount"
+            type="number"
+            name="amount"
+            value={formData.amount}
+            onChange={handleChange}
+            placeholder="125.00"
+            step="0.01"
+            min="0.01"
+            required
+            disabled={isLoading}
+          />
+        </div>
 
-      <div className="form-group">
-        <label htmlFor="description">Description</label>
-        <input
-          id="description"
-          type="text"
-          name="description"
-          value={formData.description}
-          onChange={handleChange}
-          placeholder="What did you spend on?"
-          maxLength="200"
-          required
-          disabled={isLoading}
-        />
-      </div>
-
-      <div className="form-group">
-        <label htmlFor="date">Date</label>
-        <input
-          id="date"
-          type="date"
-          name="date"
-          value={formData.date}
-          onChange={handleChange}
-          required
-          disabled={isLoading}
-        />
-      </div>
-
-      <AnimatePresence>
-        {error && (
-          <motion.div 
-            className="error-message"
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
+        <div className="form-group">
+          <label htmlFor="category">Category</label>
+          <select
+            id="category"
+            name="category"
+            value={formData.category}
+            onChange={handleChange}
+            disabled={isLoading}
           >
-            {error}
-          </motion.div>
-        )}
-      </AnimatePresence>
+            <option value="food">Food</option>
+            <option value="transport">Transport</option>
+            <option value="entertainment">Entertainment</option>
+            <option value="utilities">Utilities</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
 
-      <motion.button 
-        type="submit" 
-        className="submit-btn"
-        disabled={isLoading}
-        whileTap={{ scale: 0.98 }}
-      >
-        <PlusCircle size={20} />
-        {isLoading ? 'Adding...' : 'Add Expense'}
-      </motion.button>
-    </form>
+        <div className="form-group full-width">
+          <label htmlFor="description">Description</label>
+          <input
+            id="description"
+            type="text"
+            name="description"
+            value={formData.description}
+            onChange={handleChange}
+            placeholder="Client lunch, rent, medicine, commute"
+            maxLength="200"
+            required
+            disabled={isLoading}
+          />
+        </div>
+
+        <div className="form-group full-width">
+          <label htmlFor="date">Date</label>
+          <input
+            id="date"
+            type="date"
+            name="date"
+            value={formData.date}
+            onChange={handleChange}
+            required
+            disabled={isLoading}
+          />
+        </div>
+
+        <AnimatePresence>
+          {error && (
+            <motion.div 
+              className="error-message full-width"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+            >
+              {error}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <motion.button 
+          type="submit" 
+          className="submit-btn full-width"
+          disabled={isLoading}
+          whileTap={{ scale: 0.98 }}
+        >
+          {isLoading ? 'Saving...' : 'Save expense'}
+        </motion.button>
+      </form>
+    </div>
   );
 }
