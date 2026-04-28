@@ -1,10 +1,17 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useContext } from 'react';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { expenseAPI } from './api/expenseClient';
 import { formatCurrency, formatDate } from './utils/formatting';
+import { AuthContext } from './context/AuthContext';
 import ExpenseForm from './components/ExpenseForm';
+import Login from './components/Login';
+import Register from './components/Register';
 import './App.css';
 
-function App() {
+function DashboardView() {
+  const { user, logout } = useContext(AuthContext);
+  const navigate = useNavigate();
+  
   const [expenses, setExpenses] = useState([]);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [budget, setBudget] = useState('25000');
@@ -12,8 +19,8 @@ function App() {
   // View Controls state
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [dateWindow, setDateWindow] = useState('all'); // 'all', 'month'
-  const [sortOrder, setSortOrder] = useState('newest'); // 'newest', 'oldest'
+  const [dateWindow, setDateWindow] = useState('all');
+  const [sortOrder, setSortOrder] = useState('newest');
 
   useEffect(() => {
     const fetchExpenses = async () => {
@@ -42,39 +49,33 @@ function App() {
     }
   };
 
-  // Filter and Sort Logic
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
   const filteredExpenses = useMemo(() => {
     let result = [...expenses];
-    
-    // Search
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       result = result.filter(e => e.description.toLowerCase().includes(query) || e.category.toLowerCase().includes(query));
     }
-    
-    // Category
     if (selectedCategory) {
       result = result.filter(e => e.category === selectedCategory);
     }
-    
-    // Date window
     if (dateWindow === 'month') {
       const now = new Date();
       const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
       result = result.filter(e => new Date(e.date) >= firstDay);
     }
-    
-    // Sort
     result.sort((a, b) => {
       const dateA = new Date(a.date).getTime();
       const dateB = new Date(b.date).getTime();
       return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
     });
-    
     return result;
   }, [expenses, searchQuery, selectedCategory, dateWindow, sortOrder]);
 
-  // Derived stats
   const visibleSpend = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
   const avgTransaction = filteredExpenses.length ? visibleSpend / filteredExpenses.length : 0;
   
@@ -91,8 +92,6 @@ function App() {
     largestExpense = filteredExpenses.reduce((max, e) => e.amount > max.amount ? e : max, filteredExpenses[0]);
   }
 
-  // Category breakdown (based on all or filtered?)
-  // Image says "Category breakdown", usually of visible
   const categoryTotals = filteredExpenses.reduce((acc, e) => {
     acc[e.category] = (acc[e.category] || 0) + e.amount;
     return acc;
@@ -110,30 +109,18 @@ function App() {
   };
 
   const todayStr = new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date());
-
   const budgetUsedPct = parseFloat(budget) > 0 ? Math.min(100, (mtdSpend / (parseFloat(budget) * 100)) * 100) : 0;
 
   const handleExportCSV = () => {
     if (filteredExpenses.length === 0) return;
-    
-    // Headers
     const headers = ['Date', 'Category', 'Description', 'Amount (INR)'];
-    
-    // Rows
     const csvRows = filteredExpenses.map(exp => [
       formatDate(exp.date),
       exp.category,
-      `"${exp.description.replace(/"/g, '""')}"`, // escape quotes
+      `"${exp.description.replace(/"/g, '""')}"`,
       (exp.amount / 100).toFixed(2)
     ]);
-    
-    // Combine
-    const csvContent = [
-      headers.join(','),
-      ...csvRows.map(row => row.join(','))
-    ].join('\n');
-    
-    // Download
+    const csvContent = [headers.join(','), ...csvRows.map(row => row.join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -146,20 +133,21 @@ function App() {
 
   return (
     <div className="layout-container">
-      {/* Header */}
       <div className="header-section">
         <div className="header-left">
           <div className="header-label">EXPENSE INTELLIGENCE</div>
           <h1>Control every rupee with a realistic money command center.</h1>
-          <p>Track expenses, monitor budget burn, search quickly, and understand spending patterns with live insights designed for daily use.</p>
+          <p>Welcome back, {user?.name}. Track expenses, monitor budget burn, search quickly, and understand spending patterns.</p>
         </div>
         <div className="header-right">
-          <div className="theme-pill">Theme: Sunrise Ledger</div>
+          <div style={{display: 'flex', gap: '1rem', alignItems: 'center'}}>
+            <div className="theme-pill">Theme: Sunrise Ledger</div>
+            <button onClick={handleLogout} className="theme-pill" style={{cursor: 'pointer', background: 'var(--danger-light)', color: 'var(--danger)', border: 'none'}}>Logout</button>
+          </div>
           <div className="date-text">{todayStr}</div>
         </div>
       </div>
 
-      {/* Summary Grid */}
       <div className="summary-grid">
         <div className="summary-card glass-card">
           <h3>Visible spend</h3>
@@ -183,7 +171,6 @@ function App() {
         </div>
       </div>
 
-      {/* Main Grid */}
       <div className="main-grid">
         <div className="col-left">
           <ExpenseForm onExpenseCreated={handleExpenseCreated} />
@@ -264,18 +251,7 @@ function App() {
                 <h2 className="card-title" style={{marginBottom: 0}}>Transactions ledger</h2>
               </div>
               <div style={{display: 'flex', gap: '0.5rem', alignItems: 'center'}}>
-                <button 
-                  onClick={handleExportCSV} 
-                  style={{
-                    background: 'transparent', 
-                    border: '1px solid var(--input-border)', 
-                    padding: '0.25rem 0.75rem', 
-                    borderRadius: '999px', 
-                    fontSize: '0.75rem', 
-                    color: 'var(--text-main)',
-                    cursor: 'pointer'
-                  }}
-                >
+                <button onClick={handleExportCSV} style={{background: 'transparent', border: '1px solid var(--input-border)', padding: '0.25rem 0.75rem', borderRadius: '999px', fontSize: '0.75rem', color: 'var(--text-main)', cursor: 'pointer'}}>
                   Export CSV
                 </button>
                 <div className="record-count">{filteredExpenses.length} records</div>
@@ -300,20 +276,7 @@ function App() {
                     <td>{exp.description}</td>
                     <td>{formatDate(exp.date)}</td>
                     <td style={{textAlign: 'right'}}>
-                      <button 
-                        onClick={() => handleDelete(exp.id)}
-                        style={{
-                          background: 'transparent',
-                          color: '#d9534f',
-                          padding: '4px 8px',
-                          fontSize: '0.8rem',
-                          fontWeight: '600',
-                          border: 'none',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        Delete
-                      </button>
+                      <button onClick={() => handleDelete(exp.id)} style={{background: 'transparent', color: '#d9534f', padding: '4px 8px', fontSize: '0.8rem', fontWeight: '600', border: 'none', cursor: 'pointer'}}>Delete</button>
                     </td>
                   </tr>
                 ))}
@@ -327,4 +290,33 @@ function App() {
   );
 }
 
-export default App;
+// Protected Route Component
+function ProtectedRoute({ children }) {
+  const { user, loading } = useContext(AuthContext);
+  
+  if (loading) {
+    return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>Loading...</div>;
+  }
+  
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  return children;
+}
+
+export default function App() {
+  const { user } = useContext(AuthContext);
+  
+  return (
+    <Routes>
+      <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
+      <Route path="/register" element={user ? <Navigate to="/" replace /> : <Register />} />
+      <Route path="/" element={
+        <ProtectedRoute>
+          <DashboardView />
+        </ProtectedRoute>
+      } />
+    </Routes>
+  );
+}

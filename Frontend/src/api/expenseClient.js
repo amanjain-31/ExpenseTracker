@@ -11,15 +11,31 @@ export function generateIdempotencyKey() {
 }
 
 /**
+ * Retrieve auth token from localStorage
+ */
+function getAuthToken() {
+  return localStorage.getItem('token');
+}
+
+/**
  * Retry with exponential backoff
  * Handles transient network failures
  */
-async function retryFetch(url, options, maxRetries = 3) {
+async function retryFetch(url, options = {}, maxRetries = 3) {
   let lastError;
+
+  // Add auth token to headers
+  const token = getAuthToken();
+  const headers = {
+    ...options.headers,
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+  };
+  
+  const finalOptions = { ...options, headers };
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      const response = await fetch(url, options);
+      const response = await fetch(url, finalOptions);
 
       // Only retry on network/timeout errors, not on 4xx/5xx
       if (response.ok || response.status >= 400) {
@@ -66,7 +82,6 @@ export const expenseAPI = {
     });
 
     const data = await response.json();
-
     if (!response.ok) {
       const err = new Error(data.error || 'Failed to create expense');
       err.statusCode = response.status;

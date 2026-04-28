@@ -27,12 +27,13 @@ const { idempotencyMiddleware } = require('./middleware/idempotency');
 
 // Import routes
 const expenseRoutes = require('./routes/expenses');
-
-// Apply idempotency middleware globally for POST/PUT/DELETE
-app.use(idempotencyMiddleware);
+const authRoutes = require('./routes/auth');
 
 // Routes
-app.use('/api/expenses', expenseRoutes);
+app.use('/api/auth', authRoutes);
+
+// Apply idempotency middleware only for expenses
+app.use('/api/expenses', idempotencyMiddleware, expenseRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
