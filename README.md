@@ -1,316 +1,81 @@
-# Expense Tracker - Production-Quality Implementation
+# Sunrise Ledger - Personal Finance Tracker
 
-A minimal expense tracking application built with focus on:
-- **Idempotency**: Prevents duplicate expense creation from retries, refreshes, or double-clicks
-- **Money Correctness**: Integer-based (cents) storage to avoid floating-point errors
-- **Resilience**: Automatic retry logic with exponential backoff
-- **Clean Architecture**: Well-organized, maintainable code structure
-
-## Tech Stack
-
-- **Backend**: Node.js + Express + MongoDB + Mongoose
-- **Frontend**: React + Vite
-- **API**: RESTful with idempotency keys (UUID v4)
-
-## Architecture Highlights
-
-### Idempotency Strategy
-- Every mutation request (POST/PUT/DELETE) includes an `X-Idempotency-Key` header (UUID v4)
-- Server caches responses by idempotency key in `ProcessedRequest` collection
-- Duplicate requests return cached response without side effects
-- TTL index: automatic cleanup after 24 hours
-
-### Money Handling
-- All amounts stored as **integers (cents)** in database
-- Client converts USD (e.g., "10.50") → cents (1050) before sending
-- Server validates amounts as integers to prevent precision errors
-- Display layer converts cents → USD for UI
-
-### API Design
-
-#### Endpoints
-
-```
-POST   /api/expenses          - Create expense (with X-Idempotency-Key)
-GET    /api/expenses          - List expenses with filtering & sorting
-GET    /api/expenses/:id      - Get single expense
-DELETE /api/expenses/:id      - Delete expense (with X-Idempotency-Key)
-```
-
-#### GET /api/expenses - Query Parameters
-
-| Parameter | Type | Description | Example |
-|-----------|------|-------------|---------|
-| `category` | string | Filter by category | `?category=food` |
-| `sort` | string | Sort order: `date_desc` (default), `date_asc`, `amount_desc`, `amount_asc` | `?sort=amount_desc` |
-| `startDate` | ISO date | Filter expenses on or after date | `?startDate=2024-01-01` |
-| `endDate` | ISO date | Filter expenses on or before date | `?endDate=2024-01-31` |
-
-**Examples:**
-- `GET /api/expenses` → all expenses, newest first
-- `GET /api/expenses?category=food` → food expenses only, newest first
-- `GET /api/expenses?sort=amount_desc` → all expenses sorted by highest cost
-- `GET /api/expenses?category=food&sort=amount_desc` → food expenses, highest cost first
-- `GET /api/expenses?startDate=2024-01-01&endDate=2024-01-31` → January expenses
-
-### Frontend Resilience
-- **Retry Logic**: Exponential backoff (1s, 2s, 4s) for transient failures
-- **Optimistic Updates**: Show expense immediately, rollback on failure
-- **Button Disabling**: Prevent double-click submissions
-- **Error Handling**: User-friendly error messages
-
-### Database Schema
-
-**Expenses**
-```javascript
-{
-  _id: ObjectId,
-  description: String (required, max 200 chars),
-  amount: Number (required, integer cents),
-  category: String (enum: food, transport, entertainment, utilities, other),
-  date: Date (required),
-  createdAt: Date,
-  updatedAt: Date
-}
-```
-
-**ProcessedRequests** (Idempotency Cache)
-```javascript
-{
-  _id: ObjectId,
-  idempotencyKey: String (unique, indexed),
-  method: String (POST/PUT/DELETE),
-  endpoint: String,
-  response: {
-    statusCode: Number,
-    body: Mixed (cached response)
-  },
-  createdAt: Date (TTL: 24 hours)
-}
-```
-
-## Setup Instructions
-
-### Prerequisites
-- Node.js 18+
-- MongoDB (local or Atlas)
-
-### Backend Setup
-
-```bash
-cd Backend
-npm install
-
-# Create .env file
-cp .env.example .env
-
-# Edit .env with your MongoDB URI
-# MONGODB_URI=mongodb://localhost:27017/expense-tracker
-
-# Start server
-npm start
-```
-
-Server runs on `http://localhost:3001`
-
-### Frontend Setup
-
-```bash
-cd Frontend
-npm install
-
-# Create .env file (optional - defaults to http://localhost:3001/api)
-cp .env.example .env
-
-# Start dev server
-npm run dev
-```
-
-Frontend runs on `http://localhost:5173`
-
-## Testing the Idempotency
-
-### Via curl
-```bash
-# First request (creates expense)
-curl -X POST http://localhost:3001/api/expenses \
-  -H "Content-Type: application/json" \
-  -H "X-Idempotency-Key: abc-123" \
-  -d '{
-    "amount": 1050,
-    "category": "food",
-    "description": "Coffee",
-    "date": "2024-01-15"
-  }'
-
-# Same request with same idempotency key (returns cached response, no duplicate)
-curl -X POST http://localhost:3001/api/expenses \
-  -H "Content-Type: application/json" \
-  -H "X-Idempotency-Key: abc-123" \
-  -d '{
-    "amount": 1050,
-    "category": "food",
-    "description": "Coffee",
-    "date": "2024-01-15"
-  }'
-
-# Different idempotency key (creates new expense)
-curl -X POST http://localhost:3001/api/expenses \
-  -H "Content-Type: application/json" \
-  -H "X-Idempotency-Key: def-456" \
-  -d '{
-    "amount": 1050,
-    "category": "food",
-    "description": "Coffee",
-    "date": "2024-01-15"
-  }'
-```
-
-### Via Browser
-1. Add an expense in the form
-2. Notice the expense appears immediately (optimistic update)
-3. Try clicking "Add Expense" rapidly - only one will be created due to idempotency
-4. Try refreshing the page before the response arrives - expense won't duplicate
-
-## Error Handling
-
-### Client-Side
-- Network timeouts trigger automatic retry (up to 3 attempts)
-- Display user-friendly error messages
-- Form remains usable after errors
-
-### Server-Side
-- Input validation with detailed error messages
-- Proper HTTP status codes (400, 404, 500)
-- Global error handler
-- CORS enabled for frontend origin
-
-## Production Considerations
-
-### What's Included (Minimal, Production-Ready)
-- ✓ Idempotency implementation with TTL cleanup
-- ✓ Integer-based money handling
-- ✓ Input validation
-- ✓ Error handling
-- ✓ Retry logic with exponential backoff
-- ✓ Clean separation of concerns
-
-### What to Add (Beyond Scope)
-- Authentication & authorization
-- Rate limiting
-- Request logging
-- Database backup strategy
-- Monitoring & alerting
-- API documentation (Swagger/OpenAPI)
-- Frontend build optimization
-- E2E testing
-
-## Notes on Design Decisions
-
-**1. Idempotency Keys vs Etags**
-- We use idempotency keys (not Etags) because:
-  - Prevents duplicate creation (Etag only prevents overwrites)
-  - Works naturally with POST requests
-  - Standard in financial/payment APIs
-
-**2. Integer Storage for Money**
-- Avoids floating-point precision errors
-- Industry standard (all financial systems do this)
-- Conversion happens at boundaries (API ↔ UI)
-
-**3. TTL Index for Cache**
-- Prevents unbounded growth of ProcessedRequest collection
-- 24-hour window covers most retry scenarios
-- Automatic cleanup via MongoDB
-
-**4. No Transaction Support (Yet)**
-- MongoDB replica sets support ACID transactions
-- Not needed for single-document operations (expenses)
-- Can be added if multi-step operations are required
-
-**5. Exponential Backoff**
-- 1s, 2s, 4s delays for transient failures
-- Prevents overwhelming server during outages
-- Industry standard for resilient systems
-
-## Deployment
-
-### Backend Deployment (e.g., Heroku)
-```bash
-# Set environment variables
-heroku config:set MONGODB_URI="..." NODE_ENV="production"
-
-# Deploy
-git push heroku main
-```
-
-### Frontend Deployment (e.g., Vercel)
-```bash
-# Set environment variable
-VITE_API_URL=https://your-backend.herokuapp.com/api
-
-# Deploy
-vercel
-```
-
-## File Structure
-
-```
-ExpenseTracker/
-├── Backend/
-│   ├── index.js                 # Entry point
-│   ├── models/
-│   │   ├── Expense.js           # Expense schema
-│   │   └── ProcessedRequest.js  # Idempotency cache
-│   ├── middleware/
-│   │   └── idempotency.js       # Idempotency middleware
-│   ├── routes/
-│   │   └── expenses.js          # API endpoints
-│   ├── utils/
-│   │   └── validators.js        # Input validation
-│   ├── .env.example
-│   └── package.json
-│
-└── Frontend/
-    ├── src/
-    │   ├── api/
-    │   │   └── expenseClient.js # API client with retry logic
-    │   ├── components/
-    │   │   ├── ExpenseForm.jsx  # Form component
-    │   │   ├── ExpenseForm.css
-    │   │   ├── ExpenseList.jsx  # List component
-    │   │   └── ExpenseList.css
-    │   ├── utils/
-    │   │   └── formatting.js    # Currency/date formatting
-    │   ├── App.jsx              # Main component
-    │   ├── App.css
-    │   ├── main.jsx
-    │   └── index.css
-    ├── vite.config.js
-    ├── .env.example
-    └── package.json
-```
-
-## Troubleshooting
-
-**Cannot connect to MongoDB**
-- Ensure MongoDB is running: `mongod`
-- Check connection string in .env
-- For MongoDB Atlas: whitelist your IP
-
-**CORS errors in frontend**
-- Vite proxy should handle this in dev
-- For production: update CORS origin in backend
-
-**Idempotency key not working**
-- Check `ProcessedRequest` collection for stored keys
-- Ensure header is exactly: `X-Idempotency-Key`
-
-**Money precision issues**
-- Always convert dollars → cents on frontend
-- Verify amounts are integers before sending
-- Check database stores amounts as integers
+Sunrise Ledger is a full-stack personal finance application built to help users seamlessly record, review, and understand their expenses. Designed for real-world reliability, it securely handles edge cases like slow networks, page reloads, and duplicate submissions.
 
 ---
 
-Built with focus on **correctness, reliability, and maintainability**. Not over-engineered, but production-ready.
+## 🚀 Core Features
+
+- **Expense Management:** Create, view, and manage expenses with accurate dates, categories, and descriptions.
+- **Dynamic Analysis:** Filter transactions by category and date ranges (Today, This Week, This Month).
+- **Intelligent Sorting:** Sort expenses chronologically (newest or oldest first).
+- **Live Summaries:** Instantly view the total expense amount of the currently visible/filtered list.
+- **"Nice to Have" Implementations:**
+  - Strict data validation (prevents negative amounts, enforces date schemas).
+  - Visual category breakdown & dynamic budget tracking.
+  - Comprehensive Unit Tests for data validators.
+  - Interactive UI with robust loading and error states.
+  - JWT Authentication & Multi-user isolation.
+
+---
+
+## 🧠 Architectural & Design Decisions
+
+### 1. Persistence Mechanism: MongoDB & Mongoose
+**Choice:** MongoDB (NoSQL) alongside Mongoose as an ODM.
+**Reasoning:** Personal finance data relies heavily on aggregations and rapid reading/writing. MongoDB provides excellent read performance and seamless horizontal scaling. Mongoose allows us to strictly enforce data schemas at the application layer—guaranteeing that invalid categories, negative amounts, or missing descriptions are rejected before touching the database.
+
+### 2. Money Handling & Data Correctness
+**Approach:** All monetary values are handled and stored strictly as **integer cents** (e.g., `$10.50` is stored as `1050`). 
+**Reasoning:** Floating-point arithmetic in JavaScript is notoriously imprecise (e.g., `0.1 + 0.2 = 0.30000000000000004`). By doing all calculations in integer cents and only converting to decimals for the UI, we guarantee 100% financial data accuracy and prevent rounding errors over time.
+
+### 3. Handling Real-World Network Conditions (Idempotency)
+**Approach:** Implemented an `X-Idempotency-Key` mechanism for the `POST /api/expenses` endpoint.
+**Reasoning:** In real-world scenarios, users might accidentally double-click the "Submit" button, or mobile browsers might automatically retry a request due to a dropped connection. 
+- The React frontend generates a unique UUID for every new form submission.
+- The Express backend intercepts this UUID. If the database indicates this specific request was already processed, the backend safely returns the cached success response rather than charging/creating a duplicate expense.
+
+---
+
+## ⚖️ Trade-Offs & Timebox Considerations
+
+Given the scope of the assignment, the following trade-offs were made:
+
+1. **Client-Side vs. Server-Side Filtering:** 
+   The backend API fully supports filtering and sorting via query parameters (e.g., `?category=food&sort=date_desc`). However, for an ultra-responsive UX, the frontend fetches the user's dataset and handles minor filtering locally. *Trade-off:* If a user accumulates tens of thousands of expenses over years, this approach consumes excess browser memory. In a large-scale production app, I would implement cursor-based pagination and rely purely on the database index for filtering.
+   
+2. **Testing Coverage:**
+   While I implemented backend unit tests for the core data validation logic, comprehensive End-to-End (E2E) UI testing using tools like Cypress or Playwright was omitted due to time constraints.
+
+---
+
+## 🚫 What Was Intentionally Omitted
+
+- **OAuth / Social Login:** To keep the focus strictly on the core CRUD expense requirements and system reliability, advanced authentication methods (like Google/GitHub login) were skipped in favor of a straightforward, secure JWT/bcrypt implementation.
+- **Complex Budgeting Features:** Features like rollover budgets, multi-currency support, or custom user-defined categories were left out to maintain a minimal, polished, and bug-free core feature set.
+
+---
+
+## 🛠️ Setup & Local Development
+
+### Prerequisites
+- Node.js (v18+)
+- MongoDB (Local instance or Atlas URI)
+
+### Backend Setup
+1. Navigate to the backend directory: `cd Backend`
+2. Install dependencies: `npm install`
+3. Set environment variables: Create a `.env` file containing:
+   ```env
+   PORT=3001
+   MONGODB_URI=mongodb://localhost:27017/expense-tracker
+   JWT_SECRET=your_secure_secret
+   ```
+4. Run the server: `node index.js`
+5. Run unit tests: `node --test tests/validators.test.js`
+
+### Frontend Setup
+1. Navigate to the frontend directory: `cd Frontend`
+2. Install dependencies: `npm install`
+3. Start the Vite development server: `npm run dev`
+4. The application will be available at `http://localhost:5173`.
