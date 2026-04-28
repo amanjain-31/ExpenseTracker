@@ -4,6 +4,12 @@ Sunrise Ledger is a full-stack personal finance application built to help users 
 
 ---
 
+## 🌐 Live Demo
+- **Frontend (Live Application):** [https://expense-tracker-lac-mu.vercel.app/](https://expense-tracker-lac-mu.vercel.app/)
+- **Backend API:** `https://sunriseledger.onrender.com`
+
+---
+
 ## 🚀 Core Features
 
 - **Expense Management:** Create, view, and manage expenses with accurate dates, categories, and descriptions.
