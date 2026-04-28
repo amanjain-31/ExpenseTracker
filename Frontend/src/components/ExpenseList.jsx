@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { expenseAPI } from '../api/expenseClient';
 import { formatCurrency, formatDate } from '../utils/formatting';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Trash2, Search } from 'lucide-react';
 import './ExpenseList.css';
 
 export default function ExpenseList({ refreshTrigger }) {
@@ -11,13 +13,13 @@ export default function ExpenseList({ refreshTrigger }) {
     category: '',
     sort: 'date_desc',
   });
+  const [searchQuery, setSearchQuery] = useState('');
 
   const loadExpenses = async (currentFilters = filters) => {
     setIsLoading(true);
     setError(null);
 
     try {
-      // Build query object with non-empty filters
       const queryFilters = {};
       if (currentFilters.category) queryFilters.category = currentFilters.category;
       if (currentFilters.sort) queryFilters.sort = currentFilters.sort;
@@ -40,7 +42,6 @@ export default function ExpenseList({ refreshTrigger }) {
     const { name, value } = e.target;
     const newFilters = { ...filters, [name]: value };
     setFilters(newFilters);
-    // Reload expenses with new filters
     loadExpenses(newFilters);
   };
 
@@ -51,7 +52,6 @@ export default function ExpenseList({ refreshTrigger }) {
 
     try {
       await expenseAPI.deleteExpense(id);
-      // Remove from list
       setExpenses(prev => prev.filter(exp => exp.id !== id));
     } catch (err) {
       console.error('Failed to delete expense:', err);
@@ -59,25 +59,38 @@ export default function ExpenseList({ refreshTrigger }) {
     }
   };
 
+  const filteredExpenses = useMemo(() => {
+    if (!searchQuery.trim()) return expenses;
+    const query = searchQuery.toLowerCase();
+    return expenses.filter(exp => 
+      exp.description.toLowerCase().includes(query)
+    );
+  }, [expenses, searchQuery]);
+
   if (isLoading) {
-    return <div className="expense-list"><p>Loading expenses...</p></div>;
+    return <div className="expense-list glass-panel"><p className="loading-text">Loading expenses...</p></div>;
   }
 
   if (error) {
-    return <div className="expense-list"><p className="error-message">{error}</p></div>;
+    return <div className="expense-list glass-panel"><p className="error-message">{error}</p></div>;
   }
-
-  if (expenses.length === 0) {
-    return <div className="expense-list"><p className="empty-state">No expenses yet. Add your first expense!</p></div>;
-  }
-
-  const totalAmount = expenses.reduce((sum, exp) => sum + exp.amount, 0);
 
   return (
-    <div className="expense-list">
-      <h2>Expenses</h2>
+    <div className="expense-list glass-panel">
+      <div className="list-header">
+        <h2>Recent Transactions</h2>
+        <div className="search-container">
+          <Search size={18} className="search-icon" />
+          <input
+            type="text"
+            placeholder="Search descriptions..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="search-input"
+          />
+        </div>
+      </div>
 
-      {/* Filter and Sort Controls */}
       <div className="filter-controls">
         <div className="filter-group">
           <label htmlFor="category-filter">Category:</label>
@@ -112,45 +125,56 @@ export default function ExpenseList({ refreshTrigger }) {
         </div>
       </div>
 
-      <div className="total-section">
-        <p className="total-label">Total Spent:</p>
-        <p className="total-amount">{formatCurrency(totalAmount)}</p>
-      </div>
-
-      <div className="expenses-table-container">
-        <table className="expenses-table">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Category</th>
-              <th>Description</th>
-              <th>Amount</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {expenses.map(expense => (
-              <tr key={expense.id}>
-                <td>{formatDate(expense.date)}</td>
-                <td className="category-cell">
-                  {getCategoryEmoji(expense.category)} {expense.category}
-                </td>
-                <td>{expense.description}</td>
-                <td className="amount-cell">{formatCurrency(expense.amount)}</td>
-                <td className="action-cell">
-                  <button
-                    className="delete-btn"
-                    onClick={() => handleDelete(expense.id)}
-                    title="Delete expense"
-                  >
-                    ✕
-                  </button>
-                </td>
+      {filteredExpenses.length === 0 ? (
+        <p className="empty-state">No matching expenses found.</p>
+      ) : (
+        <div className="expenses-table-container">
+          <table className="expenses-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Category</th>
+                <th>Description</th>
+                <th>Amount</th>
+                <th className="action-header">Action</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              <AnimatePresence>
+                {filteredExpenses.map(expense => (
+                  <motion.tr 
+                    key={expense.id}
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <td className="date-cell">{formatDate(expense.date)}</td>
+                    <td className="category-cell">
+                      <span className="category-badge">
+                        {getCategoryEmoji(expense.category)} {expense.category}
+                      </span>
+                    </td>
+                    <td className="description-cell">{expense.description}</td>
+                    <td className="amount-cell">{formatCurrency(expense.amount)}</td>
+                    <td className="action-cell">
+                      <motion.button
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                        className="delete-btn"
+                        onClick={() => handleDelete(expense.id)}
+                        title="Delete expense"
+                      >
+                        <Trash2 size={16} />
+                      </motion.button>
+                    </td>
+                  </motion.tr>
+                ))}
+              </AnimatePresence>
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

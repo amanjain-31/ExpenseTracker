@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { expenseAPI } from '../api/expenseClient';
 import { dollarsToCents, getTodayForInput } from '../utils/formatting';
+import { motion, AnimatePresence } from 'framer-motion';
+import { PlusCircle } from 'lucide-react';
 import './ExpenseForm.css';
 
 export default function ExpenseForm({ onExpenseCreated }) {
@@ -20,7 +22,6 @@ export default function ExpenseForm({ onExpenseCreated }) {
       ...prev,
       [name]: value,
     }));
-    // Clear error when user starts typing
     if (error) setError(null);
   };
 
@@ -30,10 +31,8 @@ export default function ExpenseForm({ onExpenseCreated }) {
     setIsLoading(true);
 
     try {
-      // Convert dollars to cents
       const amountInCents = dollarsToCents(formData.amount);
 
-      // Send to API
       const createdExpense = await expenseAPI.createExpense({
         amount: amountInCents,
         category: formData.category,
@@ -41,7 +40,6 @@ export default function ExpenseForm({ onExpenseCreated }) {
         date: formData.date,
       });
 
-      // Reset form
       setFormData({
         amount: '',
         category: 'food',
@@ -49,7 +47,6 @@ export default function ExpenseForm({ onExpenseCreated }) {
         date: getTodayForInput(),
       });
 
-      // Notify parent
       onExpenseCreated?.(createdExpense);
     } catch (err) {
       console.error('Failed to create expense:', err);
@@ -60,7 +57,7 @@ export default function ExpenseForm({ onExpenseCreated }) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="expense-form">
+    <form onSubmit={handleSubmit} className="expense-form glass-panel">
       <h2>Add Expense</h2>
 
       <div className="form-group">
@@ -124,11 +121,28 @@ export default function ExpenseForm({ onExpenseCreated }) {
         />
       </div>
 
-      {error && <div className="error-message">{error}</div>}
+      <AnimatePresence>
+        {error && (
+          <motion.div 
+            className="error-message"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+          >
+            {error}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      <button type="submit" disabled={isLoading}>
+      <motion.button 
+        type="submit" 
+        className="submit-btn"
+        disabled={isLoading}
+        whileTap={{ scale: 0.98 }}
+      >
+        <PlusCircle size={20} />
         {isLoading ? 'Adding...' : 'Add Expense'}
-      </button>
+      </motion.button>
     </form>
   );
 }
