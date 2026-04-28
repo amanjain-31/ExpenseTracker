@@ -62,7 +62,7 @@ async function retryFetch(url, options = {}, maxRetries = 3) {
  * Handles idempotency and retry logic
  */
 export const expenseAPI = {
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3001/api',
+  baseURL: (import.meta.env.VITE_API_URL || 'http://localhost:3001/api').replace(/\/+$/, '') + (import.meta.env.VITE_API_URL && !import.meta.env.VITE_API_URL.endsWith('/api') ? '/api' : ''),
 
   /**
    * Create a new expense

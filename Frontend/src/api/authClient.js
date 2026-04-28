@@ -1,5 +1,5 @@
 export const authAPI = {
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3001/api',
+  baseURL: (import.meta.env.VITE_API_URL || 'http://localhost:3001/api').replace(/\/+$/, '') + (import.meta.env.VITE_API_URL && !import.meta.env.VITE_API_URL.endsWith('/api') ? '/api' : ''),
 
   async register(name, email, password) {
     const response = await fetch(`${this.baseURL}/auth/register`, {
