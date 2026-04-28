@@ -78,15 +78,20 @@ export const expenseAPI = {
 
   /**
    * Get all expenses
-   * @param {Object} filters - { startDate, endDate, category }
+   * @param {Object} filters - { category, sort, startDate, endDate }
+   *   - category: string (food, transport, entertainment, utilities, other)
+   *   - sort: string (date_desc, date_asc, amount_desc, amount_asc) - defaults to date_desc
+   *   - startDate: string (ISO date)
+   *   - endDate: string (ISO date)
    * @returns {Promise<Object>} { expenses: [...] }
    */
   async getExpenses(filters = {}) {
     const params = new URLSearchParams();
 
+    if (filters.category) params.append('category', filters.category);
+    if (filters.sort) params.append('sort', filters.sort);
     if (filters.startDate) params.append('startDate', filters.startDate);
     if (filters.endDate) params.append('endDate', filters.endDate);
-    if (filters.category) params.append('category', filters.category);
 
     const queryString = params.toString();
     const url = queryString ? `${this.baseURL}/expenses?${queryString}` : `${this.baseURL}/expenses`;

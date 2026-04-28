@@ -7,25 +7,42 @@ export default function ExpenseList({ refreshTrigger }) {
   const [expenses, setExpenses] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [filters, setFilters] = useState({
+    category: '',
+    sort: 'date_desc',
+  });
 
-  const loadExpenses = async () => {
+  const loadExpenses = async (currentFilters = filters) => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const data = await expenseAPI.getExpenses();
+      // Build query object with non-empty filters
+      const queryFilters = {};
+      if (currentFilters.category) queryFilters.category = currentFilters.category;
+      if (currentFilters.sort) queryFilters.sort = currentFilters.sort;
+
+      const data = await expenseAPI.getExpenses(queryFilters);
       setExpenses(data.expenses || []);
     } catch (err) {
       console.error('Failed to load expenses:', err);
-      setError('Failed to load expenses. Please try again.');
+      setError(err.message || 'Failed to load expenses. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    loadExpenses();
+    loadExpenses(filters);
   }, [refreshTrigger]);
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    const newFilters = { ...filters, [name]: value };
+    setFilters(newFilters);
+    // Reload expenses with new filters
+    loadExpenses(newFilters);
+  };
 
   const handleDelete = async (id) => {
     if (!confirm('Are you sure you want to delete this expense?')) {
@@ -59,6 +76,41 @@ export default function ExpenseList({ refreshTrigger }) {
   return (
     <div className="expense-list">
       <h2>Expenses</h2>
+
+      {/* Filter and Sort Controls */}
+      <div className="filter-controls">
+        <div className="filter-group">
+          <label htmlFor="category-filter">Category:</label>
+          <select
+            id="category-filter"
+            name="category"
+            value={filters.category}
+            onChange={handleFilterChange}
+          >
+            <option value="">All Categories</option>
+            <option value="food">🍔 Food</option>
+            <option value="transport">🚗 Transport</option>
+            <option value="entertainment">🎬 Entertainment</option>
+            <option value="utilities">💡 Utilities</option>
+            <option value="other">📌 Other</option>
+          </select>
+        </div>
+
+        <div className="filter-group">
+          <label htmlFor="sort-filter">Sort:</label>
+          <select
+            id="sort-filter"
+            name="sort"
+            value={filters.sort}
+            onChange={handleFilterChange}
+          >
+            <option value="date_desc">Newest First</option>
+            <option value="date_asc">Oldest First</option>
+            <option value="amount_desc">Highest Cost First</option>
+            <option value="amount_asc">Lowest Cost First</option>
+          </select>
+        </div>
+      </div>
 
       <div className="total-section">
         <p className="total-label">Total Spent:</p>

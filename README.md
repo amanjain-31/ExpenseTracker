@@ -27,12 +27,31 @@ A minimal expense tracking application built with focus on:
 - Display layer converts cents → USD for UI
 
 ### API Design
+
+#### Endpoints
+
 ```
 POST   /api/expenses          - Create expense (with X-Idempotency-Key)
-GET    /api/expenses          - List all expenses
+GET    /api/expenses          - List expenses with filtering & sorting
 GET    /api/expenses/:id      - Get single expense
 DELETE /api/expenses/:id      - Delete expense (with X-Idempotency-Key)
 ```
+
+#### GET /api/expenses - Query Parameters
+
+| Parameter | Type | Description | Example |
+|-----------|------|-------------|---------|
+| `category` | string | Filter by category | `?category=food` |
+| `sort` | string | Sort order: `date_desc` (default), `date_asc`, `amount_desc`, `amount_asc` | `?sort=amount_desc` |
+| `startDate` | ISO date | Filter expenses on or after date | `?startDate=2024-01-01` |
+| `endDate` | ISO date | Filter expenses on or before date | `?endDate=2024-01-31` |
+
+**Examples:**
+- `GET /api/expenses` → all expenses, newest first
+- `GET /api/expenses?category=food` → food expenses only, newest first
+- `GET /api/expenses?sort=amount_desc` → all expenses sorted by highest cost
+- `GET /api/expenses?category=food&sort=amount_desc` → food expenses, highest cost first
+- `GET /api/expenses?startDate=2024-01-01&endDate=2024-01-31` → January expenses
 
 ### Frontend Resilience
 - **Retry Logic**: Exponential backoff (1s, 2s, 4s) for transient failures

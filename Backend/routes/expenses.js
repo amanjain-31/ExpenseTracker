@@ -68,12 +68,19 @@ router.post('/', async (req, res, next) => {
 /**
  * GET /api/expenses
  * 
- * Retrieves all expenses, optionally filtered by date range or category
+ * Retrieves all expenses with optional filtering and sorting
  * 
  * Query params:
- *   startDate: string (ISO date)
- *   endDate: string (ISO date)
- *   category: string
+ *   category: string          → filter by category (food, transport, entertainment, utilities, other)
+ *   sort: string              → sort order (date_desc=default, date_asc, amount_desc, amount_asc)
+ *   startDate: string (ISO)   → filter by date range start
+ *   endDate: string (ISO)     → filter by date range end
+ * 
+ * Examples:
+ *   GET /api/expenses                                    → all expenses, newest first
+ *   GET /api/expenses?category=food                      → food expenses, newest first
+ *   GET /api/expenses?sort=date_asc                      → all expenses, oldest first
+ *   GET /api/expenses?category=food&sort=amount_desc    → food expenses, highest cost first
  * 
  * Response (200):
  * {
@@ -86,23 +93,65 @@ router.get('/', async (req, res, next) => {
   try {
     const query = {};
 
-    // Optional: filter by date range
-    if (req.query.startDate || req.query.endDate) {
-      query.date = {};
-      if (req.query.startDate) {
-        query.date.$gte = new Date(req.query.startDate);
-      }
-      if (req.query.endDate) {
-        query.date.$lte = new Date(req.query.endDate);
-      }
-    }
-
-    // Optional: filter by category
+    // Filter by category if provided
     if (req.query.category) {
+      const validCategories = ['food', 'transport', 'entertainment', 'utilities', 'other'];
+      if (!validCategories.includes(req.query.category)) {
+        const err = new Error(`Invalid category. Must be one of: ${validCategories.join(', ')}`);
+        err.statusCode = 400;
+        return next(err);
+      }
       query.category = req.query.category;
     }
 
-    const expenses = await Expense.find(query).sort({ date: -1 }).lean();
+    // Filter by date range if provided
+    if (req.query.startDate || req.query.endDate) {
+      query.date = {};
+      if (req.query.startDate) {
+        const startDate = new Date(req.query.startDate);
+        if (isNaN(startDate.getTime())) {
+          const err = new Error('Invalid startDate. Must be a valid ISO date string');
+          err.statusCode = 400;
+          return next(err);
+        }
+        query.date.$gte = startDate;
+      }
+      if (req.query.endDate) {
+        const endDate = new Date(req.query.endDate);
+        if (isNaN(endDate.getTime())) {
+          const err = new Error('Invalid endDate. Must be a valid ISO date string');
+          err.statusCode = 400;
+          return next(err);
+        }
+        query.date.$lte = endDate;
+      }
+    }
+
+    // Determine sort order
+    let sortOptions = { date: -1 }; // Default: newest first
+    
+    if (req.query.sort) {
+      switch (req.query.sort) {
+        case 'date_asc':
+          sortOptions = { date: 1 };
+          break;
+        case 'date_desc':
+          sortOptions = { date: -1 };
+          break;
+        case 'amount_desc':
+          sortOptions = { amount: -1 };
+          break;
+        case 'amount_asc':
+          sortOptions = { amount: 1 };
+          break;
+        default:
+          const err = new Error('Invalid sort parameter. Must be one of: date_desc, date_asc, amount_desc, amount_asc');
+          err.statusCode = 400;
+          return next(err);
+      }
+    }
+
+    const expenses = await Expense.find(query).sort(sortOptions).lean();
 
     res.json({
       expenses: expenses.map(exp => ({
